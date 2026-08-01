@@ -65,3 +65,57 @@ Anselm's second ask — a board *recognizer* — turned out to be the easy half:
 the server posts the screenshot to a vision model and asks for the placement
 field, then loads it into the editor for correction. On the reddit screenshot
 it returned the position exactly, first try.
+
+---
+
+## Round two: reading the board here, and turning the pieces
+
+Two follow-ups from Anselm: could the diagram reader run client-side, and
+could the board be shown in three.js with real pieces.
+
+### The reader, in the browser, with no model
+
+`web/vision.js` — canvas only, no network, no weights. It leans on the one
+fact that makes rendered diagrams tractable: **every rook in an image is the
+same sprite**, so the job is not "recognise a rook" but "notice these four
+squares hold one shape, then put six names to at most twelve shapes."
+
+1. **Grid** — a board contributes nine evenly spaced edge lines per axis;
+   nothing else in a screenshot does. Scan (offset, size) for the best-scoring
+   comb of nine.
+2. **Squares and pieces** — *flood the square inward from the cell's own
+   border*. Comparing neighbouring pixels rather than one global colour is
+   what makes wood grain, gradients and pale squares all behave. Two guards
+   earned their place: a **leash** (the flood may not wander further from the
+   square's level than its texture does — without it, a soft outline is a
+   gradient staircase the flood walks straight up into the piece), and
+   **largest-central-blob** filtering (a piece is one shape in the middle of
+   its square; grain leaves scattered specks).
+3. **Colour** — the glyph's dominant brightness against its square. Every set
+   is a broad fill with a thin contrasting outline, so the mode is the fill.
+4. **Names** — silhouettes rendered from the Unicode chess figures, matched by
+   normalised mask, with chess as the referee: exactly one king a side, no
+   pawns on the back ranks, and — since there are only six kinds of chessman —
+   fold the closest shapes together until at most six remain.
+
+Result on Anselm's Reddit screenshot: **exact**, all twelve pieces. Across
+synthetic diagrams in four board styles × three positions: **12/12**. Heavy
+photographic grain still breaks it, which is why the model on the server stays
+as a fallback — and the **legality audit picks the winner**: if the local read
+is structurally impossible, ask the model instead. Recognition and rules
+checking reinforcing each other is nicer than either alone.
+
+Bugs worth the telling: `findLines` named its offset `x0` on both axes, so the
+vertical origin came back `undefined` and every cell sampled empty space. And
+my own *test fixture* was wrong for an hour — it drew hairline glyphs with a
+fat contrasting stroke, so its "black" pieces really were mostly light pixels
+and the reader was right to call them white. Bad fixtures accuse good code.
+
+### Pieces, turned rather than downloaded
+
+`web/board3d.js`. CC0 chess GLBs do exist, but a Staunton set is a silhouette
+revolved around its axis — which is precisely `LatheGeometry`. So the set is
+six profiles plus a crown of spheres, a ring of crenellations, a cross, and an
+extruded head for the knight, who declines to be a solid of revolution. No
+licences, no megabytes, sharp at any resolution, and it matches how the rest
+of these projects are built. Loaded lazily on the first 3D toggle.

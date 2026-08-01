@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
 <title>Proof Game — how could this position have happened?</title>
 <style>
 	:root { --bg:#12151c; --panel:#181d26; --line:#2a3140; --ink:#e6ecf5; --muted:#8b98ad;
@@ -53,6 +57,11 @@
 	footer a { color:var(--accent); }
 	#exlist a { color:var(--accent); text-decoration:none; }
 	#exlist a:hover { text-decoration:underline; }
+	#board3d { display:none; width:min(464px,88vw); height:min(400px,76vw); border:1px solid var(--line);
+		border-radius:8px; overflow:hidden; }
+	#board3d canvas { display:block; }
+	body.three #board { display:none; }
+	body.three #board3d { display:block; }
 	#drop { border:1.5px dashed var(--line); border-radius:10px; padding:12px; text-align:center; color:var(--muted);
 		font-size:13px; cursor:pointer; }
 	#drop.over { border-color:var(--accent); color:var(--ink); }
@@ -68,12 +77,14 @@
 	<div class="cols">
 		<div class="left">
 			<div id="board"></div>
+			<div id="board3d"></div>
 			<div class="palette" id="palette"></div>
 			<div class="hint">click a piece then a square · click a piece on the board to erase · drag not needed</div>
 			<div class="row">
 				<button id="clear">clear</button>
 				<button id="reset">start position</button>
 				<button id="flip">flip</button>
+				<button id="view3d">3D</button>
 				<select id="turn"><option value="w">white to move</option><option value="b">black to move</option></select>
 			</div>
 			<div class="row"><input type="text" id="fen" spellcheck="false" /><button id="load">load</button></div>

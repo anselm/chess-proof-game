@@ -64,6 +64,7 @@ function fromFEN(fen) {
 
 function sync() {
   render();
+  if (document.body.classList.contains('three')) three?.setPosition(board);
   const fen = toFEN();
   $('#fen').value = fen;
   moves = null; $('#score').innerHTML = '';
@@ -93,6 +94,23 @@ $('#palette').onclick = (e) => {
 $('#clear').onclick = () => { board = new Array(64).fill(''); sync(); };
 $('#reset').onclick = () => { fromFEN(START); sync(); };
 $('#flip').onclick = () => { flipped = !flipped; render(); };
+
+// 3D view: same position, turned pieces, loaded only when first asked for
+let three = null;
+$('#view3d').onclick = async () => {
+  document.body.classList.toggle('three');
+  const on = document.body.classList.contains('three');
+  $('#view3d').textContent = on ? '2D' : '3D';
+  if (on && !three) {
+    $('#view3d').disabled = true;
+    try {
+      const { createBoard3D } = await import('./board3d.js');
+      three = createBoard3D($('#board3d'));
+    } catch (e) { document.body.classList.remove('three'); $('#view3d').textContent = '3D'; }
+    $('#view3d').disabled = false;
+  }
+  if (on) { three?.resize(); three?.setPosition(board); }
+};
 $('#turn').onchange = (e) => { turn = e.target.value; sync(); };
 $('#load').onclick = () => { try { fromFEN($('#fen').value); sync(); } catch (e) {} };
 $('#fen').onkeydown = (e) => { if (e.key === 'Enter') $('#load').click(); };
@@ -118,15 +136,36 @@ $('#solve').onclick = () => {
 };
 $('#stop').onclick = () => { worker?.terminate(); worker = null; $('#solve').disabled = false; $('#stop').disabled = true; $('#status').textContent = 'stopped'; };
 
-// image → position, read by a vision model server-side
+// image → position. The local reader runs first: it is instant, private and
+// free. A model on the server is the fallback for images it cannot make sense
+// of — and the legality audit is the referee that decides which to believe.
 const drop = $('#drop');
+const plausible = (fen) => {
+  try {
+    const b = Board.fromFEN(fen);
+    return audit(b).legal && b.pieces(WHITE).some((p) => p.type === 6) && b.pieces(BLACK).some((p) => p.type === 6);
+  } catch { return false; }
+};
 const readImage = async (file) => {
   drop.textContent = 'reading the diagram…';
-  const fd = new FormData(); fd.append('image', file);
   try {
+    const V = await import('./vision.js');
+    const local = V.readBoard(await V.toImageData(file));
+    if (local.fen && plausible(local.fen)) {
+      fromFEN(local.fen); sync();
+      drop.textContent = `read here in your browser — ${local.pieces} pieces, ${Math.round(local.confidence * 100)}% shape confidence. Check it and fix any square.`;
+      return;
+    }
+    drop.textContent = local.error
+      ? `local reader: ${local.error} — asking the model…`
+      : 'local reading looked wrong — asking the model…';
+    if (local.fen) { fromFEN(local.fen); sync(); }
+  } catch (e) { drop.textContent = 'local reader failed — asking the model…'; }
+  try {
+    const fd = new FormData(); fd.append('image', file);
     const r = await fetch('/api/vision', { method: 'POST', body: fd });
     const j = await r.json();
-    if (j.fen) { fromFEN(j.fen); sync(); drop.textContent = `read as ${j.fen.split(' ')[0]} — check it and correct any square`; }
+    if (j.fen) { fromFEN(j.fen); sync(); drop.textContent = `read by the model — check it and correct any square`; }
     else drop.textContent = `could not read it: ${j.error ?? 'unknown'}`;
   } catch (e) { drop.textContent = 'reading failed: ' + e.message; }
 };
