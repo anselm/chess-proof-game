@@ -1,0 +1,21 @@
+{
+  "name": "proofgame",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test/perft.mjs && node test/solve.mjs",
+    "cli": "node src/cli.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "ws": "^8.21.1"
+  }
+}

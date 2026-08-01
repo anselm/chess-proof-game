@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Proof Game — how could this position have happened?</title>
+<style>
+	:root { --bg:#12151c; --panel:#181d26; --line:#2a3140; --ink:#e6ecf5; --muted:#8b98ad;
+		--light:#c9d6e3; --dark:#5b7d99; --accent:#7fb4ff; --good:#6ee7a0; --bad:#ff8a7a; }
+	* { box-sizing:border-box; }
+	body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-serif,system-ui,sans-serif;
+		display:flex; justify-content:center; padding:20px 14px 60px; }
+	main { width:min(1080px,100%); }
+	h1 { font-size:24px; margin:0 0 4px; letter-spacing:.01em; }
+	h1 b { color:var(--accent); }
+	.sub { color:var(--muted); font-size:14px; margin-bottom:18px; line-height:1.6; }
+	.cols { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; }
+	.left { flex:0 0 auto; }
+	.right { flex:1 1 340px; min-width:320px; }
+	#board { --sq:min(58px,11vw); display:grid; grid-template-columns:repeat(8,var(--sq));
+		grid-auto-rows:var(--sq); width:calc(var(--sq)*8); border:2px solid var(--line);
+		border-radius:6px; overflow:hidden; user-select:none; }
+	.sq { display:flex; align-items:center; justify-content:center; font-size:calc(var(--sq)*0.78);
+		line-height:1; cursor:pointer; position:relative; }
+	.sq.l { background:var(--light); } .sq.d { background:var(--dark); }
+	.sq.hi { outline:3px solid var(--accent); outline-offset:-3px; }
+	.sq span { pointer-events:none; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+	.wp { color:#fff; } .bp { color:#101418; }
+	.coord { position:absolute; font-size:9px; color:rgba(0,0,0,.4); left:2px; top:1px; font-weight:700; }
+	.palette { display:flex; flex-wrap:wrap; gap:5px; margin:12px 0 6px; }
+	.pk { width:36px; height:36px; border-radius:6px; border:1px solid var(--line); background:var(--panel);
+		font-size:24px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+	.pk.sel { border-color:var(--accent); background:#22314a; }
+	button, select { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px;
+		padding:9px 14px; font-size:14px; cursor:pointer; font-family:inherit; }
+	button.primary { background:var(--accent); color:#0a0f18; border-color:var(--accent); font-weight:700; }
+	button:disabled { opacity:.5; cursor:default; }
+	.row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0; }
+	input[type=text] { flex:1; min-width:220px; background:#0e1219; border:1px solid var(--line); border-radius:8px;
+		color:var(--ink); padding:9px 11px; font-family:ui-monospace,monospace; font-size:12.5px; }
+	.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px; }
+	.card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin:0 0 10px; }
+	.verdict { font-weight:700; font-size:15px; margin-bottom:8px; }
+	.ok { color:var(--good); } .no { color:var(--bad); }
+	ul { margin:6px 0 0; padding-left:18px; } li { margin:3px 0; font-size:13.5px; line-height:1.5; }
+	li.prob { color:var(--bad); } li.note { color:var(--muted); }
+	#score { font-family:ui-monospace,monospace; font-size:13px; line-height:1.85; word-spacing:2px; }
+	#score span { padding:1px 3px; border-radius:4px; cursor:pointer; }
+	#score span.on { background:var(--accent); color:#0a0f18; }
+	#status { color:var(--muted); font-size:13px; min-height:20px; font-family:ui-monospace,monospace; }
+	.hint { color:var(--muted); font-size:12.5px; line-height:1.6; }
+	footer { margin-top:26px; color:var(--muted); font-size:12px; line-height:1.7; }
+	footer a { color:var(--accent); }
+	#exlist a { color:var(--accent); text-decoration:none; }
+	#exlist a:hover { text-decoration:underline; }
+	#drop { border:1.5px dashed var(--line); border-radius:10px; padding:12px; text-align:center; color:var(--muted);
+		font-size:13px; cursor:pointer; }
+	#drop.over { border-color:var(--accent); color:var(--ink); }
+</style>
+</head>
+<body>
+<main>
+	<h1><b>PROOF GAME</b> — how could this position have happened?</h1>
+	<div class="sub">Set up any position and this tries to play a legal game from the opening array to it, with
+	both players cooperating. It also audits the position for outright impossibility — a useful check on puzzle
+	diagrams, which are sometimes unreachable.</div>
+
+	<div class="cols">
+		<div class="left">
+			<div id="board"></div>
+			<div class="palette" id="palette"></div>
+			<div class="hint">click a piece then a square · click a piece on the board to erase · drag not needed</div>
+			<div class="row">
+				<button id="clear">clear</button>
+				<button id="reset">start position</button>
+				<button id="flip">flip</button>
+				<select id="turn"><option value="w">white to move</option><option value="b">black to move</option></select>
+			</div>
+			<div class="row"><input type="text" id="fen" spellcheck="false" /><button id="load">load</button></div>
+			<div id="drop">drop a board screenshot here (or click) — it will be read into the editor</div>
+		</div>
+
+		<div class="right">
+			<div class="card">
+				<h2>legality audit</h2>
+				<div id="audit"></div>
+			</div>
+			<div class="card">
+				<h2>proof game</h2>
+				<div class="row">
+					<button class="primary" id="solve">find a game</button>
+					<select id="mode">
+						<option value="auto">auto (shortest, then any)</option>
+						<option value="exact">shortest only</option>
+						<option value="any">any game (deep)</option>
+					</select>
+					<button id="stop" disabled>stop</button>
+				</div>
+				<div id="status"></div>
+				<div id="score"></div>
+			</div>
+			<div class="card" id="examples">
+				<h2>examples</h2>
+				<div class="hint" id="exlist"></div>
+			</div>
+		</div>
+	</div>
+
+	<footer>
+		Shortest-proof-game search is exact but only reaches ~8 moves; deeper positions get a
+		constructive game that is legal but not minimal. Positions needing dozens of captures are
+		beyond it — those are the domain of dedicated solvers (Euclide, Natch, Jacobi).
+		<br>Engine, audit and search all run in your browser. <span id="ver"></span>
+	</footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
