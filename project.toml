@@ -1,0 +1,7 @@
+name = "chess-proof-game"
+horizon = "2026"
+repo = "anselm/chess-proof-game"
+code = "local"
+deploy = "exe:proofgame"
+autodeploy = false
+notes = ""
